@@ -1,274 +1,145 @@
+import torch
+
 import argparse
+import core.metrics as Metrics
+import model as Model
+
+import os
+import numpy as np
 
 
-# Training settings
-parser = argparse.ArgumentParser(description='PyTorch Super Res Example')
-parser.add_argument(
-    '--upscale_factor',
-    type=int,
-    default=4,
-    help="Super-Resolution upscale factor",
-)
-parser.add_argument(
-    '--batchSize',
-    type=int,
-    default=8,
-    help='Training batch size',
-)
-parser.add_argument(
-    '--testBatchSize',
-    type=int,
-    default=5,
-    help='Testing batch size',
-)
-parser.add_argument(
-    '--start_epoch',
-    type=int,
-    default=1,
-    help='Starting epoch for continuing training',
-)
-parser.add_argument(
-    '--nEpochs',
-    type=int,
-    default=150,
-    help='Number of epochs to train for',
-)
-parser.add_argument(
-    '--snapshots',
-    type=int,
-    default=5,
-    help='Snapshots',
-)
-parser.add_argument(
-    '--lr',
-    type=float,
-    default=1e-4,
-    help='Learning Rate. Default=0.01',
-)
-parser.add_argument(
-    '--gpu_mode',
-    type=bool,
-    default=False
-)
-parser.add_argument(
-    '--threads',
-    type=int,
-    default=8,
-    help='number of threads for data loader to use',
-)
-parser.add_argument(
-    '--seed',
-    type=int,
-    default=123,
-    help='random seed to use. Default=123',
-)
-parser.add_argument(
-    '--gpus',
-    default=8,
-    type=int,
-    help='Number of GPUs',
-)
-parser.add_argument(
-    '--data_dir',
-    type=str,
-    default='./vimeo_septuplet/sequences',
-)
-parser.add_argument(
-    '--file_list',
-    type=str,
-    default='sep_trainlist.txt',
-)
-parser.add_argument(
-    '--other_dataset',
-    type=bool,
-    default=False,
-    help="Use other dataset than vimeo-90k",
-)
-parser.add_argument(
-    '--future_frame',
-    type=bool,
-    default=True,
-    help="use future frame",
-)
-parser.add_argument(
-    '--nFrames',
-    type=int,
-    default=7,
-)
-parser.add_argument(
-    '--patch_size',
-    type=int,
-    default=64,
-    help='0 to use original frame size'
-)
-parser.add_argument(
-    '--data_augmentation',
-    type=bool,
-    default=True,
-)
-parser.add_argument('--model_type', type=str, default='RBPN')
-parser.add_argument('--residual', type=bool, default=False)
-parser.add_argument(
-    '--pretrained_sr',
-    default='RBPN_4x_F11_NTIRE2019.pth',
-    help='sr pretrained base model',
-)
-parser.add_argument(
-    '--pretrained',
-    type=bool,
-    default=False,
-)
-parser.add_argument(
-    '--save_folder',
-    default='weights/',
-    help='Location to save checkpoint models',
-)
-parser.add_argument(
-    '--prefix',
-    default='F7',
+parser = argparse.ArgumentParser()
+parser.add_argument('-c', '--config', type=str, default='config/config.json', help='JSON file for configuration')
+parser.add_argument('p', '--phase', type=str, choices=['train','val'],
+                    help='Run either train(training) or val(generation)',
+                    default='train')
+parser.add_argument('-gpu', '--gpu_ids', type=str, default=None)
+
+
+diffusion = Model.create_model(opt)
+
+current_step = diffusion.begin_step
+current_epoch = diffusion.begin_epoch
+n_iter = opt['train']['n_iter']
+
+diffusion.set_new_noise_schedule(
+    opt['model']['beta_schedule'][opt['phase']],
+    schedule_phase=opt['phase']
 )
 
+if opt['phase'] == 'train':
+    while current_step < n_iter:
+        current_epoch += 1
+        for _, train_data in enumerate(train_loader):
+            current_step += 1
+            if current_step > n_iter:
+                break
+            diffusion.feed_data(train_data)
+            diffusion.ooptimize_parameters()
 
-opt = parser.parse_args()
-gpus_list = range(opt.gpus)
-hostname = str(socket.gethostname())
-cudnn.benchmark = True
-print(opt)
+            if current_step % opt['train']['val_freq'] == 0:
+                avg_psnr = 0.0
+                idx = 0
+                result_path = '{}/{}'.format(opt['path']['results'], current_epoch)
+                os.makedirs(result_path, exist_ok=True)
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+                diffusion.set_new_noise_schedule(
+                    opt['model']['beta_schedule']['val'],
+                    schedule_phase='val',
+                )
+                for _, val_data in enumerate(val_loader):
+                    idx += 1
+                    diffusion.feed_data(val_data)
+                    diffusion.test(continuous=False)
+                    visuals = diffusion.get_current_visuals()
+                    sr_img = Metrics.tensor2img(visuals['SR'])
+                    hr_img = Metrics.tensor2img(visuals['HR'])
+                    lr_img = Metrics.tensor2img(visuals['LR'])
+                    fake_img = Metrics.tensor2img(visuals['INF'])
 
+                    avg_psnr += Metrics.calculate_psnr(sr_img, hr_img)
 
-def train(epoch):
-    epoch_loss = 0
-    model.train()
-    #import pdb; pdb.set_trace()
-    for iteration, batch in enumerate(training_data_loader, 1):
-        #import pdb; pdb.set_trace()
+                avg_psnr = avg_psnr / idx
+                diffusion.set_new_noise_schedule(
+                    opt['model']['beta_schedule']['train'],
+                    schedule_phase='train'
+                )
 
-        input, target, neigbor, flow, bicubic = batch[0], batch[1], batch[2], batch[3], batch[4]
-        input = Variable(input).to(device=device, dtype=torch.float)
-        bicubic = Variable(bicubic).to(device=device, dtype=torch.float)
-        neigbor = [Variable(j).to(device=device, dtype=torch.float) for j in neigbor]
-        flow = [Variable(j).to(device=device, dtype=torch.float) for j in flow]
+else:
+    avg_psnr = 0.0
+    avg_ssim = 0.0
+    idx = 0
+    result_path = '{}'.format(opt['path']['results'])
+    os.makedirs(result_path, exist_ok=True)
+    for _, val_data in enumerate(val_loader):
+        idx+=1
+        diffusion.feed_data(val_data)
+        diffusion.test(continuous=False)
+        visuals = diffusion.get_current_visuals()
 
-        optimizer.zero_grad()
-        t0 = time.time()
-        prediction = model(input, neigbor, flow)
+        hr_img = Metrics.tensor2img(visuals['HR'])
+        lr_img = Metrics.tensor2img(visuals['LR'])
+        fake_img = Metrics.tensor2img(visuals['INF'])
 
-        if opt.residual:
-            prediction = prediction + bicubic
-
-        loss = criterion(prediction, target)
-        t1 = time.time()
-        #import pdb; pdb.set_trace()
-        epoch_loss += loss.item()
-        #epoch_loss += loss.data[0]
-        loss.backward()
-        optimizer.step()
-
-
-        print("==> Epoch[{}]({}/{}): Loss: {:.4f} || Timer: {:.4f} sec.".format(epoch, iteration, len(training_data_loader), loss.item(), (t1 - t0)))
-
-    print("==> Epoch {} Complete: Avg. Loss: {:.4f}".format(epoch, epoch_loss / len(training_data_loader)))
-
-
-def print_network(net):
-    num_params = 0
-    for param in net.parameters():
-        num_params += param.numel()
-    print(net)
-    print('Total number of parameters: %d' % num_params)
-
-
-def checkpoint(epoch):
-    model_out_path = opt.save_folder + str(opt.upscale_factor) +'x_' + hostname + opt.model_type + opt.prefix + "_epoch_{}.pth".format(epoch)
-    torch.save(model.state_dict(), model_out_path)
-
-    print("Checkpoint saved to {}".format(model_out_path))
-
-
-cuda = opt.gpu_mode
-if cuda and not torch.cuda.is_available():
-    raise Exception("No GPU found, please run without --cuda")
-
-
-torch.manual_seed(opt.seed)
-if cuda:
-    torch.cuda.manual_seed(opt.seed)
-
-
-print('==> Loading datasets')
-train_set = get_training_set(
-    opt.data_dir,
-    opt.nFrames,
-    opt.upscale_factor,
-    opt.data_augmentation,
-    opt.file_list,
-    opt.other_dataset,
-    opt.patch_size,
-    opt.future_frame,
-)
-#test_set = get_eval_set(opt.test_dir, opt.nFrames, opt.upscale_factor, opt.data_augmentation)
-
-training_data_loader = DataLoader(
-    dataset=train_set,
-    num_workers=opt.threads,
-    batch_size=opt.batchSize,
-    shuffle=True,
-)
-#testing_data_loader = DataLoader(dataset=test_set, num_workers=opt.threads, batch_size=opt.batchSize, shuffle=False)
-
-
-model = torch.nn.DataParallel(model, device_ids=gpus_list)
-#criterion = nn.L1Loss()
-
-
-print('---------- NETWORK ARCHITECTURE -------------')
-print_network(model)
-print('---------------------------------------------')
-
-
-if opt.pretrained:
-    model_name = os.path.join(opt.save_folder + opt.pretrained_sr)
-    if os.path.exists(model_name):
-        #model= torch.load(model_name, map_location=lambda storage, loc: storage)
-        model.load_state_dict(
-            torch.load(
-                model_name,
-                map_location=lambda storage,
-                loc: storage
+        sr_img_mode = 'grid'
+        if sr_img_mode == 'single':
+            # single img series
+            sr_img = visuals['SR']  # uint8
+            sample_num = sr_img.shape[0]
+            for iter in range(0, sample_num):
+                Metrics.save_img(
+                    Metrics.tensor2img(sr_img[iter]),
+                    '{}/{}_{}_sr_{}.png'.format(
+                        result_path,
+                        current_step,
+                        idx,
+                        iter,
+                    )
+                )
+        else:
+            # grid img
+            sr_img = Metrics.tensor2img(visuals['SR'])  # uint8
+            Metrics.save_img(
+                sr_img,
+                '{}/{}_{}_sr_process.png'.format(
+                    result_path,
+                    current_step,
+                    idx,
+                )
             )
+            Metrics.save_img(
+                Metrics.tensor2img(visuals['SR'][-1]),
+                '{}/{}_{}_sr.png'.format(
+                    result_path,
+                    current_step,
+                    idx,
+                )
+            )
+
+        Metrics.save_img(
+            hr_img,
+            '{}/{}_{}_hr.png'.format(result_path, current_step, idx),
         )
-        print('Pre-trained SR model loaded.')
-
-
-if cuda:
-    model = model.cuda(gpus_list[0])
-    criterion = criterion.cuda(gpus_list[0])
-
-
-optimizer = optim.Adam(
-    model.parameters(),
-    lr=opt.lr,
-    betas=(0.9, 0.999),
-    eps=1e-8,
-)
-
-
-for epoch in range(opt.start_epoch, opt.nEpochs + 1):
-    train(epoch)
-    #test()
-
-    # learning rate is decayed by a factor of 10 every half of total epochs
-    if (epoch+1) % (opt.nEpochs/2) == 0:
-        for param_group in optimizer.param_groups:
-            param_group['lr'] /= 10.0
-
-        print(
-            'Learning rate decay: lr={}'.format(
-                optimizer.param_groups[0]['lr']
-            )
+        Metrics.save_img(
+            lr_img,
+            '{}/{}_{}_lr.png'.format(result_path, current_step, idx),
+        )
+        Metrics.save_img(
+            fake_img,
+            '{}/{}_{}_inf.png'.format(result_path, current_step, idx),
         )
 
-    if (epoch+1) % (opt.snapshots) == 0:
-        checkpoint(epoch)
+        eval_psnr = Matrics.calculate_psnr(
+            Metrics.tensor2img(visuals['SR'][-1]),
+            hr_img,
+        )
+        eval_ssim = Metrics.calculate_ssim(
+            Metrics.tensor2img(visuals['SR'][-1]),
+            hr_img,
+        )
+
+        avg_psnr += eval_psnr
+        avg_ssim += eval_ssim
+
+    avg_psnr = avg_psnr / idx
+    avg_ssim = avg_ssim / idx
