@@ -29,16 +29,17 @@ class REDSDataset(data.Dataset):
     support reading N LQ frames, N = 1, 3, 5, 7
     '''
 
-    def __init__(self, opt):
+    def __init__(self, opt, phase):
         super(REDSDataset, self).__init__()
         self.opt = opt
+        self.phase = phase
         # temporal augmentation
         self.interval_list = opt['interval_list']
         self.random_reverse = opt['random_reverse']
         logger.info('Temporal augmentation interval list: [{}], with random reverse is {}.'.format(
             ','.join(str(x) for x in opt['interval_list']), self.random_reverse))
 
-        self.half_N_frames = opt['N_frames'] // 2
+        self.half_N_frames = opt['n_frames'] // 2
         self.GT_root, self.LQ_root = opt['dataroot_GT'], opt['dataroot_LQ']
         self.data_type = self.opt['data_type']
         self.LR_input = False if opt['GT_size'] == opt['LQ_size'] else True  # low resolution inputs
@@ -54,10 +55,10 @@ class REDSDataset(data.Dataset):
                 'Need to create cache keys (meta_info.pkl) by running [create_lmdb.py]')
 
         # remove the REDS4 for testing
-        self.paths_GT = [
-            v for v in self.paths_GT if v.split('_')[0] not in ['000', '011', '015', '020']
-        ]
-        assert self.paths_GT, 'Error: GT path is empty.'
+        # self.paths_GT = [
+        #     v for v in self.paths_GT if v.split('\\')[-2] not in ['000', '011', '015', '020']
+        # ]
+        # assert self.paths_GT, 'Error: GT path is empty.'
 
         if self.data_type == 'lmdb':
             self.GT_env, self.LQ_env = None, None
@@ -109,14 +110,14 @@ class REDSDataset(data.Dataset):
         scale = self.opt['scale']
         GT_size = self.opt['GT_size']
         key = self.paths_GT[index]
-        name_a, name_b = key.split('_')
+        _, name_a, name_b = key.split('\\')
         center_frame_idx = int(name_b)
 
         #### determine the neighbor frames
         interval = random.choice(self.interval_list)
         if self.opt['border_mode']:
             direction = 1  # 1: forward; 0: backward
-            N_frames = self.opt['N_frames']
+            N_frames = self.opt['n_frames']
             if self.random_reverse and random.random() < 0.5:
                 direction = random.choice([0, 1])
             if center_frame_idx + interval * (N_frames - 1) > 99:
@@ -145,7 +146,7 @@ class REDSDataset(data.Dataset):
             name_b = '{:08d}'.format(neighbor_list[self.half_N_frames])
 
         assert len(
-            neighbor_list) == self.opt['N_frames'], 'Wrong length of neighbor list: {}'.format(
+            neighbor_list) == self.opt['n_frames'], 'Wrong length of neighbor list: {}'.format(
                 len(neighbor_list))
 
         #### get the GT image (as the center frame)
@@ -174,7 +175,7 @@ class REDSDataset(data.Dataset):
                 img_LQ = util.read_img(None, img_LQ_path)
             img_LQ_l.append(img_LQ)
 
-        if self.opt['phase'] == 'train':
+        if self.phase == 'train':
             C, H, W = LQ_size_tuple  # LQ size
             # randomly crop
             if self.LR_input:

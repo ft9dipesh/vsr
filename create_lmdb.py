@@ -352,7 +352,7 @@ def REDS(mode):
     data_size_per_img = cv2.imread(all_img_list[0], cv2.IMREAD_UNCHANGED).nbytes
     print('data size per image is: ', data_size_per_img)
     data_size = data_size_per_img * len(all_img_list)
-    env = lmdb.open(lmdb_save_path, map_size=data_size * 10)
+    env = lmdb.open(lmdb_save_path, map_size=data_size*2)
 
     #### write data to lmdb
     pbar = util.ProgressBar(len(all_img_list))

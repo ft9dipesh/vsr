@@ -2,6 +2,7 @@ import functools
 import torch
 import torch.nn as nn
 from torch.nn import init
+from . import unet
 
 
 def weights_init_kaiming(m, scale=1):
@@ -12,7 +13,7 @@ def weights_init_kaiming(m, scale=1):
         if m.bias is not None:
             m.bias.data.zero_()
     elif classname.find('Linear') != -1:
-        init.kaiming_normal_(m.weight.data, a=0, model='fan_in')
+        init.kaiming_normal_(m.weight.data, a=0, mode='fan_in')
         m.weight.data *= scale
         if m.bias is not None:
             m.bias.data.zero_()
@@ -36,19 +37,30 @@ def define_G(opt):
     model_opt = opt['model']
 
     from model.diffusion import GaussianDiffusion
-    from model.unet import UNet
+    import model.EDVR.EDVR_arch as EDVR_arch
 
-    model = unet.UNet(
-        in_channel=model_opt['unet']['in_channel'],
-        out_channel=model_opt['unet']['out_channel'],
-        norm_groups=model_opt['unet']['norm_groups'],
-        inner_channel=model_opt['unet']['inner_channel'],
-        channel_mults=model_opt['unet']['channel_multiplier'],
-        attn_res=model_opt['unet']['attn_res'],
-        res_blocks=model_opt['unet']['res_blocks'],
-        dropout=model_opt['unet']['dropout'],
-        image_size=model_opt['diffusion']['image_size'],
+    model = EDVR_arch.EDVR(
+        nf=model_opt['edvr']['nf'],
+        nframes=model_opt['edvr']['nframes'],
+        groups=model_opt['edvr']['groups'],
+        front_RBs=model_opt['edvr']['front_RBs'],
+        back_RBs=model_opt['edvr']['back_RBs'],
+        center=model_opt['edvr']['center'],
+        predeblur=model_opt['edvr']['predeblur'],
+        HR_in=model_opt['edvr']['HR_in'],
+        w_TSA=model_opt['edvr']['w_TSA']
     )
+    # model = unet.UNet(
+    #     in_channel=model_opt['unet']['in_channel'],
+    #     out_channel=model_opt['unet']['out_channel'],
+    #     norm_groups=model_opt['unet']['norm_groups'],
+    #     inner_channel=model_opt['unet']['inner_channel'],
+    #     channel_mults=model_opt['unet']['channel_multiplier'],
+    #     attn_res=model_opt['unet']['attn_res'],
+    #     res_blocks=model_opt['unet']['res_blocks'],
+    #     dropout=model_opt['unet']['dropout'],
+    #     image_size=model_opt['diffusion']['image_size'],
+    # )
 
     netG = GaussianDiffusion(
         model,

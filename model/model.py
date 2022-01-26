@@ -1,3 +1,4 @@
+import logging
 from collections import OrderedDict
 
 import torch
@@ -7,6 +8,7 @@ import os
 import model.networks as networks
 from .base_model import BaseModel
 
+logger = logging.getLogger('base')
 
 class DDPM(BaseModel):
     def __init__(self, opt):
@@ -22,7 +24,7 @@ class DDPM(BaseModel):
         )
 
         if self.opt['phase'] == 'train':
-            selt.netG.train()
+            self.netG.train()
 
             if opt['model']['finetune_norm']:
                 optim_params = []
@@ -45,15 +47,16 @@ class DDPM(BaseModel):
         self.print_network()
 
     def feed_data(self, data):
-        self.data = self.set_device(data)
+        self.var_L = data['LQs'].to(self.device)
+        self.real_H = data['GT'].to(self.device)
 
     def optimize_parameters(self):
         self.optG.zero_grad()
-        l_pix = self.netG(self.data)
+        l_pix = self.netG(data)
 
         # Averaging if multi-gpu
-        b, c, h, w = self.data['HR'].shape
-        l_pix = l_pix.sum() / int(b*c*h*w)
+        # b, c, h, w = self.data['HR'].shape
+        # l_pix = l_pix.sum() / int(b*c*h*w)
 
         l_pix.backward()
         self.optG.step()
@@ -63,19 +66,19 @@ class DDPM(BaseModel):
     def get_current_visuals(self, need_LR=True, sample=False):
         out_dict = OrderedDict()
         if sample:
-            out_dict['SAM'] = self.SR.detach().float().cpu()
+            out_dict['SAM'] = self.var_L.detach().float().cpu()
         else:
-            out_dict['SR'] = self.SR.detach().float().cpu()
-            out_dict['INF'] = self.data['SR'].detach().float().cpu()
-            out_dict['HR'] = self.data['HR'].detach().float().cpu()
+            out_dict['SR'] = self.var_L.detach().float().cpu()
+            out_dict['INF'] = self.fake_H.detach().float().cpu()
+            out_dict['HR'] = self.real_H.detach().float().cpu()
             if need_LR and 'LR' in self.data:
-                out_dict['LR'] = self.data['LR'].detach().float().cpu()
+                out_dict['LR'] = self.var_L.detach().float().cpu()
             else:
                 out_dict['LR'] = out_dict['INF']
         return out_dict
 
     def set_new_noise_schedule(self, schedule_opt, schedule_phase='train'):
-        if self.schedule_phase is None or self.schedule_phase !== schedule_phase:
+        if self.schedule_phase is None or self.schedule_phase != schedule_phase:
             self.schedule_phase = schedule_phase
             if isinstance(self.netG, nn.DataParallel):
                 self.netG.module.set_new_noise_schedule(
@@ -100,7 +103,7 @@ class DDPM(BaseModel):
             if isinstance(self.netG, nn.DataParallel):
                 self.SR = self.netG.module.super_resolution(self.data['SR'], continuous)
             else:
-                self.SR = self.netG.super_resolution(self.data['SR'], continuous)
+                self.fake_H = self.netG.super_resolution(self.var_L, continuous)
         self.netG.train()
 
     def sample(self, batch_size=1, continuous=False):
@@ -111,3 +114,59 @@ class DDPM(BaseModel):
             else:
                 self.SR = self.netG.sample(batch_size, continuous)
         self.netG.train()
+
+    def print_network(self):
+        s, n = self.get_network_description(self.netG)
+        if isinstance(self.netG, nn.DataParallel):
+            net_struc_str = '{} - {}'.format(self.netG.__class__.__name__,
+                                             self.netG.module.__class__.__name__)
+        else:
+            net_struc_str = '{}'.format(self.netG.__class__.__name__)
+
+        logger.info(
+            'Network G structure: {}, with parameters: {:,d}'.format(net_struc_str, n))
+        logger.info(s)
+
+    def save_network(self, epoch, iter_step):
+        gen_path = os.path.join(
+            self.opt['path']['checkpoint'], 'I{}_E{}_gen.pth'.format(iter_step, epoch))
+        opt_path = os.path.join(
+            self.opt['path']['checkpoint'], 'I{}_E{}_opt.pth'.format(iter_step, epoch))
+        # gen
+        network = self.netG
+        if isinstance(self.netG, nn.DataParallel):
+            network = network.module
+        state_dict = network.state_dict()
+        for key, param in state_dict.items():
+            state_dict[key] = param.cpu()
+        torch.save(state_dict, gen_path)
+        # opt
+        opt_state = {'epoch': epoch, 'iter': iter_step,
+                     'scheduler': None, 'optimizer': None}
+        opt_state['optimizer'] = self.optG.state_dict()
+        torch.save(opt_state, opt_path)
+
+        logger.info(
+            'Saved model in [{:s}] ...'.format(gen_path))
+
+    def load_network(self):
+        load_path = self.opt['path']['resume_state']
+        if load_path is not None:
+            logger.info(
+                'Loading pretrained model for G [{:s}] ...'.format(load_path))
+            gen_path = '{}_gen.pth'.format(load_path)
+            opt_path = '{}_opt.pth'.format(load_path)
+            # gen
+            network = self.netG
+            if isinstance(self.netG, nn.DataParallel):
+                network = network.module
+            network.load_state_dict(torch.load(
+                gen_path), strict=(not self.opt['model']['finetune_norm']))
+            # network.load_state_dict(torch.load(
+            #     gen_path), strict=False)
+            if self.opt['phase'] == 'train':
+                # optimizer
+                opt = torch.load(opt_path)
+                self.optG.load_state_dict(opt['optimizer'])
+                self.begin_step = opt['iter']
+                self.begin_epoch = opt['epoch']
