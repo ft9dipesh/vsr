@@ -1,2 +1,4 @@
 data/dataset/
 tmp/
+experiments/
+__pycache__
