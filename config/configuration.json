@@ -51,7 +51,7 @@
         "which_model_G": "sr3",
         "finetune_norm": false,
         "unet": {
-            "in_channel": 6,
+            "in_channel": 18,
             "out_channel": 3,
             "inner_channel": 64,
             "norm_groups": 16,
@@ -65,16 +65,6 @@
             "attn_res": [],
             "res_blocks": 1,
             "dropout": 0
-        },
-        "edvr": {
-            "nf": 64,
-            "nframes": 5,
-            "groups": 8,
-            "front_RBs": 5,
-            "back_RBs": 10,
-            "predeblur": false,
-            "HR_in": false,
-            "w_TSA": true
         },
         "beta_schedule": {
             "train": {

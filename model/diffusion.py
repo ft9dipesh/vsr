@@ -214,8 +214,8 @@ class GaussianDiffusion(nn.Module):
             (1 - continuous_sqrt_alpha_cumprod**2).sqrt() * noise
         )
 
-    def p_losses(self, x_in, noise=None):
-        x_start = x_in['HR']
+    def p_losses(self, x_LRs, x_HR, noise=None):
+        x_start = x_HR
         [b, c, h, w] = x_start.shape
         t = np.random.randint(1, self.num_timesteps + 1)
         continuous_sqrt_alpha_cumprod = torch.FloatTensor(
@@ -232,14 +232,16 @@ class GaussianDiffusion(nn.Module):
         x_noisy = self.q_sample(
             x_start=x_start, continuous_sqrt_alpha_cumprod=continuous_sqrt_alpha_cumprod.view(-1, 1, 1, 1), noise=noise)
 
+        [btch, num, ch, ht, wd] = x_LRs.shape
         if not self.conditional:
-            x_recon = self.denoise_fn(x_noisy, continuous_sqrt_alpha_cumprod)
+            raise NotImplementedError('Not conditional is not implemented')
         else:
+            x_LRs_stack = torch.reshape(x_LRs, (btch, -1, ht, wd))
             x_recon = self.denoise_fn(
-                torch.cat([x_in['SR'], x_noisy], dim=1), continuous_sqrt_alpha_cumprod)
+                torch.cat([x_LRs_stack, x_noisy], dim=1), continuous_sqrt_alpha_cumprod)
 
         loss = self.loss_func(noise, x_recon)
         return loss
 
-    def forward(self, x, *args, **kwargs):
-        return self.p_losses(x, *args, **kwargs)
+    def forward(self, x_LRs, x_HR, *args, **kwargs):
+        return self.p_losses(x_LRs, x_HR, *args, **kwargs)

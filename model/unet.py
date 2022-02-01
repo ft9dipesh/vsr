@@ -161,7 +161,7 @@ class ResnetBlocWithAttn(nn.Module):
 class UNet(nn.Module):
     def __init__(
         self,
-        in_channel=6,
+        in_channel=18,
         out_channel=3,
         inner_channel=32,
         norm_groups=32,
