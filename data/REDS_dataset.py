@@ -51,8 +51,8 @@ class REDSDataset(data.Dataset):
             logger.info('Using cache keys: {}'.format(opt['cache_keys']))
             self.paths_GT = pickle.load(open(opt['cache_keys'], 'rb'))['keys']
         else:
-            raise ValueError(
-                'Need to create cache keys (meta_info.pkl) by running [create_lmdb.py]')
+            self.paths_GT, _ = util.get_image_paths(self.data_type, opt['dataroot_GT'])
+
 
         # remove the REDS4 for testing
         # self.paths_GT = [
@@ -110,7 +110,9 @@ class REDSDataset(data.Dataset):
         scale = self.opt['scale']
         GT_size = self.opt['GT_size']
         key = self.paths_GT[index]
-        _, name_a, name_b = key.split('\\')
+        name_a_file, name_b_file = key.split('\\')
+        name_a = name_a_file.split('/')[-1]
+        name_b = name_b_file.split('.')[0]
         center_frame_idx = int(name_b)
 
         #### determine the neighbor frames

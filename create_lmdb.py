@@ -16,7 +16,7 @@ import utils.util as util  # noqa: E402
 
 def main():
     dataset = 'REDS'  # vimeo90K | REDS | general (e.g., DIV2K, 291) | DIV2K_demo |test
-    mode = 'train_sharp_bicubic'  # used for vimeo90k and REDS datasets
+    mode = 'train_sharp'  # used for vimeo90k and REDS datasets
     # vimeo90k: GT | LR | flow
     # REDS: train_sharp, train_sharp_bicubic, train_blur_bicubic, train_blur, train_blur_comp
     #       train_sharp_flowx4
@@ -288,8 +288,8 @@ def REDS(mode):
     # Set False for use limited memory
     BATCH = 5000  # After BATCH images, lmdb commits, if read_all_imgs = False
     if mode == 'train_sharp':
-        img_folder = 'data/dataset/train_sharp'
-        lmdb_save_path = 'data/dataset/train_sharp_wval.lmdb'
+        img_folder = 'data/dataset/train_sharp_bicubic'
+        lmdb_save_path = 'data/dataset/train_sharp_bicubic_wval.lmdb'
         H_dst, W_dst = 720, 1280
     elif mode == 'train_sharp_bicubic':
         img_folder = 'data/dataset/train_sharp_bicubic'

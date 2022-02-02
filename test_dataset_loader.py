@@ -1,7 +1,10 @@
 import sys
 import os.path as osp
 import math
+import logging
 import torchvision.utils
+
+import core.logger as Logger
 
 sys.path.append(osp.dirname(osp.dirname(osp.abspath(__file__))))
 from data import create_dataloader, create_dataset  # noqa: E402
@@ -15,16 +18,16 @@ def main():
     opt['gpu_ids'] = [0]
     if dataset == 'REDS':
         opt['name'] = 'test_REDS'
-        opt['dataroot_GT'] = 'data/dataset/train_sharp_wval.lmdb'
-        opt['dataroot_LQ'] = 'data/dataset/train_sharp_bicubic_wval.lmdb'
+        opt['dataroot_GT'] = 'data/dataset/train_sharp/'
+        opt['dataroot_LQ'] = 'data/dataset/train_sharp_bicubic/'
         opt['mode'] = 'REDS'
-        opt['N_frames'] = 5
+        opt['n_frames'] = 1
         opt['phase'] = 'train'
         opt['use_shuffle'] = True
-        opt['n_workers'] = 8
+        opt['num_workers'] = 8
         opt['batch_size'] = 16
         opt['GT_size'] = 256
-        opt['LQ_size'] = 64
+        opt['LQ_size'] = 256
         opt['scale'] = 4
         opt['use_flip'] = True
         opt['use_rot'] = True
@@ -32,7 +35,7 @@ def main():
         opt['random_reverse'] = False
         opt['border_mode'] = False
         opt['cache_keys'] = None
-        opt['data_type'] = 'lmdb'  # img | lmdb | mc
+        opt['data_type'] = 'img'  # img | lmdb | mc
     elif dataset == 'Vimeo90K':
         opt['name'] = 'test_Vimeo90K'
         opt['dataroot_GT'] = '../../datasets/vimeo90k/vimeo90k_train_GT.lmdb'
@@ -71,9 +74,12 @@ def main():
     else:
         raise ValueError('Please implement by yourself.')
 
+    # Logger.setup_logger(None, 'logs', 'train', level=logging.INFO, screen=True)
+    # Logger.setup_logger("Validation", 'logs', 'val', level=logging.INFO)
+
     util.mkdir('tmp')
-    train_set = create_dataset(opt)
-    train_loader = create_dataloader(train_set, opt, opt, None)
+    train_set = create_dataset(opt, phase='train')
+    train_loader = create_dataloader(train_set, opt, phase='train')
     nrow = int(math.sqrt(opt['batch_size']))
     padding = 2 if opt['phase'] == 'train' else 0
 
