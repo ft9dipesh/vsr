@@ -110,9 +110,13 @@ class REDSDataset(data.Dataset):
         scale = self.opt['scale']
         GT_size = self.opt['GT_size']
         key = self.paths_GT[index]
-        name_a_file, name_b_file = key.split('\\')
-        name_a = name_a_file.split('/')[-1]
+
+        name_a = key.split('/')[-2]
+        name_b_file = key.split('/')[-1]
+        #name_a_file, name_b_file = key.split('/')
+        #name_a = name_a_file.split('/')[-1]
         name_b = name_b_file.split('.')[0]
+
         center_frame_idx = int(name_b)
 
         #### determine the neighbor frames

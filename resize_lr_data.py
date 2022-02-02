@@ -1,8 +1,8 @@
 import os
 from PIL import Image
 
-source_path = 'D:/Development/dm-vsr/data/dataset/train_sharp_bicubic/X4/'
-dest_path = 'D:/Development/dm-vsr/data/dataset/train_sharp_bicubic'
+source_path = 'data/dataset/train_sharp_bicubic/X4/'
+dest_path = 'data/dataset/train_sharp_bicubic'
 
 folders = os.listdir(source_path)
 
@@ -15,7 +15,7 @@ for item in folders:
             im = Image.open(filepath)
             f,e = os.path.splitext(filepath)
             imResize = im.resize((1280, 720), Image.BICUBIC)
-            filename=filepath.split('\\')[-1]
+            filename=filepath.split('/')[-1]
             destdir = os.path.join(dest_path, item)
             if not os.path.exists(destdir):
                 os.mkdir(destdir)

@@ -8,7 +8,7 @@ val_path = './data/dataset/val_sharp/'
 val_folders = glob.glob(os.path.join(val_path, '*'))
 for folder in val_folders:
     new_folder_idx = '{:03d}'.format(
-        int(folder.split('\\')[-1]) + 240
+        int(folder.split('/')[-1]) + 240
     )
     os.system('cp -r {} {}'.format(
         folder,

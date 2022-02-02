@@ -15,7 +15,7 @@ import numpy as np
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', type=str, default='config/configuration.json', 
+    parser.add_argument('-c', '--config', type=str, default='config/configuration.json',
                         help='JSON file for configuration')
     parser.add_argument('-p', '--phase', type=str, choices=['train', 'val'],
                         help='Run either training or generation', default='train')
@@ -35,7 +35,7 @@ def main():
 
     logger = logging.getLogger('base')
     logger.info(Logger.dict2str(opt))
-    
+
     tb_logger = SummaryWriter(log_dir=opt['path']['tb_logger'])
 
     # DATASET
@@ -46,7 +46,7 @@ def main():
         elif phase == 'val':
             val_set = create_dataset(dataset_opt, phase)
             val_loader = create_dataloader(val_set, dataset_opt, phase)
-    
+
     logger.info('Initial Dataset finished')
 
     # MODEL
@@ -71,12 +71,13 @@ def main():
     )
 
     if opt['phase'] == 'train':
+        logger.info('Start Training')
         while current_step < n_iter:
             for _, train_data in enumerate(train_loader):
                 current_step += 1
                 if current_step > n_iter:
                     break
-                
+
                 diffusion.feed_data(train_data)
                 diffusion.optimize_parameters()
 
@@ -94,7 +95,7 @@ def main():
                     psnr_rlt = {}
                     psnr_rlt_avg = {}
                     psnr_total_avg = 0.
-                    
+
                     result_path = '{}/{}'.format(opt['path']['results'], current_epoch)
                     os.makedirs(result_path, exist_ok=True)
 
@@ -111,7 +112,7 @@ def main():
                         gt_img = util.tensor2img(visuals['HR'])
                         lr_img = util.tensor2img(visuals['LR'])
                         fake_img = util.tensor2img(visuals['INF'])
-                        
+
                         Metrics.save_img(
                             gt_img, '{}/{}_{}_gt.png'.format(result_path, current_step, idx_d)
                         )
@@ -158,7 +159,7 @@ def main():
                 if current_step % opt['train']['save_checkpoint_freq'] == 0:
                     logger.info('Saving models and training states')
                     diffusion.save_network(current_epoch, current_step)
-        
+
         logger.info('End of training')
 
 if __name__ == "__main__":
