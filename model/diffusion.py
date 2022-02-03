@@ -170,11 +170,11 @@ class GaussianDiffusion(nn.Module):
         return model_mean + noise * (0.5 * model_log_variance).exp()
 
     @torch.no_grad()
-    def p_sample_loop(self, x_in, continous=False):
+    def p_sample_loop(self, x_LRs, continous=False):
         device = self.betas.device
         sample_inter = (1 | (self.num_timesteps//10))
         if not self.conditional:
-            shape = x_in
+            shape = x_LRs
             img = torch.randn(shape, device=device)
             ret_img = img
             for i in tqdm(reversed(range(0, self.num_timesteps)), desc='sampling loop time step', total=self.num_timesteps):
@@ -182,12 +182,13 @@ class GaussianDiffusion(nn.Module):
                 if i % sample_inter == 0:
                     ret_img = torch.cat([ret_img, img], dim=0)
         else:
-            x = x_in
-            shape = x.shape
+            [btch, num, ch, ht, wd] = x_LRs.shape
+            shape = (btch, ch, ht, wd)
             img = torch.randn(shape, device=device)
-            ret_img = x
+            x_LRs_stack = torch.reshape(x_LRs, (btch, -1, ht, wd))
+            ret_img = x_LRs_stack[:,3:6,:,:]
             for i in tqdm(reversed(range(0, self.num_timesteps)), desc='sampling loop time step', total=self.num_timesteps):
-                img = self.p_sample(img, i, condition_x=x)
+                img = self.p_sample(img, i, condition_x=x_LRs_stack)
                 if i % sample_inter == 0:
                     ret_img = torch.cat([ret_img, img], dim=0)
         if continous:
@@ -202,8 +203,8 @@ class GaussianDiffusion(nn.Module):
         return self.p_sample_loop((batch_size, channels, image_size, image_size), continous)
 
     @torch.no_grad()
-    def super_resolution(self, x_in, continous=False):
-        return self.p_sample_loop(x_in, continous)
+    def super_resolution(self, x_LRs, continous=False):
+        return self.p_sample_loop(x_LRs, continous)
 
     def q_sample(self, x_start, continuous_sqrt_alpha_cumprod, noise=None):
         noise = default(noise, lambda: torch.randn_like(x_start))

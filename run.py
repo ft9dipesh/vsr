@@ -91,6 +91,7 @@ def main():
                     logger.info(message)
 
                 if current_step % opt['train']['val_freq'] == 0:
+                    idx_d=0
                     pbar = util.ProgressBar(len(val_loader))
                     psnr_rlt = {}
                     psnr_rlt_avg = {}
@@ -100,46 +101,45 @@ def main():
                     os.makedirs(result_path, exist_ok=True)
 
                     for val_data in val_loader:
-                        folder = val_data['folder'][0]
-                        idx_d = val_data['idx'].item()
-                        if psnr_rlt.get(folder, None) is None:
-                            psnr_rlt[folder] = []
+                        while idx_d < 2700:
+                            idx_d+=1
+                            folder = val_data['key'][0]
+                            if psnr_rlt.get(folder, None) is None:
+                                psnr_rlt[folder] = []
 
-                        diffusion.feed_data(val_data)
-                        diffusion.test(continuous=False)
-                        visuals = diffusion.get_current_visuals()
-                        rlt_img = util.tensor2img(visuals['SR'])
-                        gt_img = util.tensor2img(visuals['HR'])
-                        lr_img = util.tensor2img(visuals['LR'])
-                        fake_img = util.tensor2img(visuals['INF'])
+                            diffusion.feed_data(val_data)
+                            diffusion.test(continuous=False)
+                            visuals = diffusion.get_current_visuals()
+                            rlt_img = util.tensor2img(visuals['SR'])
+                            gt_img = util.tensor2img(visuals['HR'])
+                            lr_img = util.tensor2img(visuals['LR'])
+                            fake_img = util.tensor2img(visuals['INF'])
 
-                        Metrics.save_img(
-                            gt_img, '{}/{}_{}_gt.png'.format(result_path, current_step, idx_d)
-                        )
-                        Metrics.save_img(
-                            rlt_img, '{}/{}_{}_rlt.png'.format(result_path, current_step, idx_d)
-                        )
-                        Metrics.save_img(
-                            lr_img, '{}/{}_{}_lr.png'.format(result_path, current_step, idx_d)
-                        )
-                        Metrics.save_img(
-                            fake_img, '{}/{}_{}_inf.png'.format(result_path, current_step, idx_d)
-                        )
-                        tb_logger.add_image(
-                            'Iter_{}'.format(current_step),
-                            np.transpose(
-                                np.concatenate(
-                                    (fake_img, rlt_img, gt_img),
-                                    axis=1
+                            Metrics.save_img(
+                                gt_img, '{}/{}_{}_gt.png'.format(result_path, current_step, idx_d)
+                            )
+                            Metrics.save_img(
+                                lr_img, '{}/{}_{}_lr.png'.format(result_path, current_step, idx_d)
+                            )
+                            Metrics.save_img(
+                                fake_img, '{}/{}_{}_inf.png'.format(result_path, current_step, idx_d)
+                            )
+                            tb_logger.add_image(
+                                'Iter_{}'.format(current_step),
+                                np.transpose(
+                                    np.concatenate(
+                                        (fake_img, rlt_img, gt_img),
+                                        axis=1
+                                    ),
+                                    [2,0,1]
                                 ),
-                                [2,0,1]
-                            ),
-                            idx_d
-                        )
+                                idx_d
+                            )
 
-                        psnr = util.calculate_psnr(rlt_img, gt_img)
-                        psnr_rlt[folder].append(psnr)
-                        pbar.update('Test {} - {}'.format(folder, idx_d))
+                            psnr = util.calculate_psnr(fake_img, gt_img)
+                            psnr_rlt[folder].append(psnr)
+                            pbar.update('Test {} - {}'.format(folder, idx_d))
+                        break
 
                     for k, v in psnr_rlt.items():
                         psnr_rlt_avg[k] = sum(v) / len(v)

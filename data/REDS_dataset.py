@@ -181,27 +181,26 @@ class REDSDataset(data.Dataset):
                 img_LQ = util.read_img(None, img_LQ_path)
             img_LQ_l.append(img_LQ)
 
-        if self.phase == 'train':
-            C, H, W = LQ_size_tuple  # LQ size
-            # randomly crop
-            if self.LR_input:
-                LQ_size = GT_size // scale
-                rnd_h = random.randint(0, max(0, H - LQ_size))
-                rnd_w = random.randint(0, max(0, W - LQ_size))
-                img_LQ_l = [v[rnd_h:rnd_h + LQ_size, rnd_w:rnd_w + LQ_size, :] for v in img_LQ_l]
-                rnd_h_HR, rnd_w_HR = int(rnd_h * scale), int(rnd_w * scale)
-                img_GT = img_GT[rnd_h_HR:rnd_h_HR + GT_size, rnd_w_HR:rnd_w_HR + GT_size, :]
-            else:
-                rnd_h = random.randint(0, max(0, H - GT_size))
-                rnd_w = random.randint(0, max(0, W - GT_size))
-                img_LQ_l = [v[rnd_h:rnd_h + GT_size, rnd_w:rnd_w + GT_size, :] for v in img_LQ_l]
-                img_GT = img_GT[rnd_h:rnd_h + GT_size, rnd_w:rnd_w + GT_size, :]
+        C, H, W = LQ_size_tuple  # LQ size
+        # randomly crop
+        if self.LR_input:
+            LQ_size = GT_size // scale
+            rnd_h = random.randint(0, max(0, H - LQ_size))
+            rnd_w = random.randint(0, max(0, W - LQ_size))
+            img_LQ_l = [v[rnd_h:rnd_h + LQ_size, rnd_w:rnd_w + LQ_size, :] for v in img_LQ_l]
+            rnd_h_HR, rnd_w_HR = int(rnd_h * scale), int(rnd_w * scale)
+            img_GT = img_GT[rnd_h_HR:rnd_h_HR + GT_size, rnd_w_HR:rnd_w_HR + GT_size, :]
+        else:
+            rnd_h = random.randint(0, max(0, H - GT_size))
+            rnd_w = random.randint(0, max(0, W - GT_size))
+            img_LQ_l = [v[rnd_h:rnd_h + GT_size, rnd_w:rnd_w + GT_size, :] for v in img_LQ_l]
+            img_GT = img_GT[rnd_h:rnd_h + GT_size, rnd_w:rnd_w + GT_size, :]
 
-            # augmentation - flip, rotate
-            img_LQ_l.append(img_GT)
-            rlt = util.augment(img_LQ_l, self.opt['use_flip'], self.opt['use_rot'])
-            img_LQ_l = rlt[0:-1]
-            img_GT = rlt[-1]
+        # augmentation - flip, rotate
+        img_LQ_l.append(img_GT)
+        rlt = util.augment(img_LQ_l, self.opt['use_flip'], self.opt['use_rot'])
+        img_LQ_l = rlt[0:-1]
+        img_GT = rlt[-1]
 
         # stack LQ images to NHWC, N is the frame number
         img_LQs = np.stack(img_LQ_l, axis=0)
