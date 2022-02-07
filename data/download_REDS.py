@@ -1,4 +1,5 @@
 import os
+import sys
 import requests
 import argparse
 
@@ -12,7 +13,7 @@ def download_file_from_google_drive(id, destination):
 
     def save_response_content(response, destination):
         CHUNK_SIZE = 32768
-
+        
         with open(destination, "wb") as f:
             for chunk in response.iter_content(CHUNK_SIZE):
                 if chunk: # filter out keep-alive new chunks
@@ -25,6 +26,7 @@ def download_file_from_google_drive(id, destination):
     response = session.get(URL, params = {'id': id}, stream=True)
     token = get_confirm_token(response)
 
+    
     if token:
         params = {'id' : id, 'confirm' : token}
         response = session.get(URL, params=params, stream=True)
@@ -43,9 +45,16 @@ def download_file_from_server(server, subset, destination):
         CHUNK_SIZE = 32768
 
         with open(destination, "wb") as f:
+            total_length = response.headers.get('content-length')
+            dl = 0
+            total_length = int(total_length)
             for chunk in response.iter_content(CHUNK_SIZE):
                 if chunk: # filter out keep-alive new chunks
+                    dl+=len(chunk)
                     f.write(chunk)
+                    done = int(50 * dl / total_length)
+                    sys.stdout.write("\r[%s%s]" % ('=' * done, ' ' * (50-done)) )
+                    sys.stdout.flush()
 
     session = requests.Session()
     if server == 'google':

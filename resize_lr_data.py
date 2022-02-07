@@ -1,8 +1,8 @@
 import os
 from PIL import Image
 
-source_path = 'data/dataset/train_sharp_bicubic/X4/'
-dest_path = 'data/dataset/train_sharp_bicubic'
+source_path = 'data/dataset/train/train_sharp_bicubic/X4/'
+dest_path = 'data/dataset/train/train_sharp_bicubic'
 
 folders = os.listdir(source_path)
 
@@ -14,6 +14,7 @@ for item in folders:
         if os.path.isfile(filepath):
             im = Image.open(filepath)
             f,e = os.path.splitext(filepath)
+            print(folderpath + '::' + f)
             imResize = im.resize((1280, 720), Image.BICUBIC)
             filename=filepath.split('/')[-1]
             destdir = os.path.join(dest_path, item)
