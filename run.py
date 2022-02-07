@@ -71,7 +71,6 @@ def main():
     )
 
     if opt['phase'] == 'train':
-        logger.info('Start Training')
         while current_step < n_iter:
             for _, train_data in enumerate(train_loader):
                 current_step += 1
