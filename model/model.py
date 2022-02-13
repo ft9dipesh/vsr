@@ -68,12 +68,12 @@ class DDPM(BaseModel):
             out_dict['SAM'] = self.var_L.detach().float().cpu()
         else:
             [btch, num, ch, ht, wd] = self.var_L.shape
-            x_LRs_stack = torch.reshape(self.var_L, (btch, -1, ht, wd))
-            var_L_target = x_LRs_stack[:,3:6,:,:]
+            x_LRs_stack = torch.reshape(self.var_L, (btch, -1, ht, wd)).to(self.device)
+            var_L_target = x_LRs_stack[:,3:6,:,:].to(self.device)
             out_dict['SR'] = var_L_target.detach().float().cpu()
             out_dict['INF'] = self.fake_H.detach().float().cpu()
             out_dict['HR'] = self.real_H.detach().float().cpu()
-            out_dict['LR'] = out_dict['SR']
+            out_dict['LR'] = self.var_L.detach().float().cpu()
         return out_dict
 
     def set_new_noise_schedule(self, schedule_opt, schedule_phase='train'):

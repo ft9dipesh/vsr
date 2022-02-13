@@ -1,0 +1,82 @@
+{
+    "name": "VSR",
+    "phase": "val",
+    "gpu_ids": null,
+    "path": {
+        "log": "logs",
+        "tb_logger": "tb_logger",
+        "results": "results",
+        "checkpoint": "checkpoint",
+        "resume_state": null
+    },
+    "datasets": {
+        "val": {
+            "name": "REDS",
+            "mode": "REDS",
+            "dataroot_GT": "data/dataset/train/train_sharp_bicubic/",
+            "dataroot_LQ": "test/test_sharp_bicubic",
+            "n_frames": 3,
+            "data_type": "img",
+            "scale": 4,
+            "GT_size": 64,
+            "LQ_size": 64,
+            "batch_size": 1,
+            "num_workers": 8,
+            "use_shuffle": true,
+            "interval_list": [1],
+            "random_reverse": false,
+            "border_mode": false,
+            "use_flip": false,
+            "use_rot": false
+        }
+    },
+    "model": {
+        "which_model_G": "sr3",
+        "finetune_norm": false,
+        "unet": {
+            "in_channel": 12,
+            "out_channel": 3,
+            "inner_channel": 64,
+            "norm_groups": 16,
+            "channel_multiplier": [
+                1,
+                2,
+                4,
+                8,
+                16
+            ],
+            "attn_res": [],
+            "res_blocks": 1,
+            "dropout": 0
+        },
+        "beta_schedule": {
+            "train": {
+                "schedule": "cosine",
+                "n_timestep": 1000,
+                "linear_start": 1e-6,
+                "linear_end": 1e-2
+            },
+            "val": {
+                "schedule": "cosine",
+                "n_timestep": 1000,
+                "linear_start": 1e-6,
+                "linear_end": 1e-2
+            }
+        },
+        "diffusion": {
+            "image_size": 256,
+            "channels": 3,
+            "conditional": true
+        }
+    },
+    "train": {
+        "n_iter": 100000,
+        "val_freq": 1e4,
+        "save_checkpoint_freq": 1e3,
+        "print_freq": 5,
+        "optimizer": {
+            "type": "adam",
+            "lr": 3e-6
+        }
+    }
+}

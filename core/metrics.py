@@ -35,8 +35,8 @@ def tensor2img(tensor, out_type=np.uint8, min_max=(-1, 1)):
 
 
 def save_img(img, img_path, mode='RGB'):
-    cv2.imwrite(img_path, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
-    # cv2.imwrite(img_path, img)
+    # cv2.imwrite(img_path, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+    cv2.imwrite(img_path, img)
 
 
 def calculate_psnr(img1, img2):

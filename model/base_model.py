@@ -27,16 +27,16 @@ class BaseModel():
         pass
 
     def set_device(self, x):
-        # if isinstance(x, dict):
-        #     for key, item in x.items():
-        #         if item is not None:
-        #             x[key] = item.to(self.device)
-        # elif isinstance(x, list):
-        #     for item in x:
-        #         if item is not None:
-        #             item = item.to(self.device)
-        # else:
-        #     x = x.to(self.device)
+        if isinstance(x, dict):
+            for key, item in x.items():
+                if item is not None:
+                    x[key] = item.to(self.device)
+        elif isinstance(x, list):
+            for item in x:
+                if item is not None:
+                    item = item.to(self.device)
+        else:
+            x = x.to(self.device)
         return x
 
     def get_network_description(self, network):

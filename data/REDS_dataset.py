@@ -185,14 +185,20 @@ class REDSDataset(data.Dataset):
         # randomly crop
         if self.LR_input:
             LQ_size = GT_size // scale
-            rnd_h = random.randint(0, max(0, H - LQ_size))
-            rnd_w = random.randint(0, max(0, W - LQ_size))
+            rnd_h = H // 3
+            rnd_w = W // 3
+            if self.phase == 'train':
+                rnd_h = random.randint(0, max(0, H - LQ_size))
+                rnd_w = random.randint(0, max(0, W - LQ_size))
             img_LQ_l = [v[rnd_h:rnd_h + LQ_size, rnd_w:rnd_w + LQ_size, :] for v in img_LQ_l]
             rnd_h_HR, rnd_w_HR = int(rnd_h * scale), int(rnd_w * scale)
             img_GT = img_GT[rnd_h_HR:rnd_h_HR + GT_size, rnd_w_HR:rnd_w_HR + GT_size, :]
         else:
-            rnd_h = random.randint(0, max(0, H - GT_size))
-            rnd_w = random.randint(0, max(0, W - GT_size))
+            rnd_h = H // 3
+            rnd_w = W // 3
+            if self.phase == 'train':
+                rnd_h = random.randint(0, max(0, H - GT_size))
+                rnd_w = random.randint(0, max(0, W - GT_size))
             img_LQ_l = [v[rnd_h:rnd_h + GT_size, rnd_w:rnd_w + GT_size, :] for v in img_LQ_l]
             img_GT = img_GT[rnd_h:rnd_h + GT_size, rnd_w:rnd_w + GT_size, :]
 

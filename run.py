@@ -70,6 +70,8 @@ def main():
         schedule_phase=opt['phase']
     )
 
+    total_val_num = 10
+
     if opt['phase'] == 'train':
         while current_step < n_iter:
             for _, train_data in enumerate(train_loader):
@@ -89,6 +91,10 @@ def main():
                         tb_logger.add_scalar(k, v, current_step)
                     logger.info(message)
 
+                if current_step % opt['train']['save_checkpoint_freq'] == 0:
+                    logger.info('Saving models and training states')
+                    diffusion.save_network(current_epoch, current_step)
+
                 if current_step % opt['train']['val_freq'] == 0:
                     idx_d=0
                     pbar = util.ProgressBar(len(val_loader))
@@ -99,9 +105,11 @@ def main():
                     result_path = '{}/{}'.format(opt['path']['results'], current_epoch)
                     os.makedirs(result_path, exist_ok=True)
 
-                    for val_data in val_loader:
-                        while idx_d < 2700:
+                    while idx_d < total_val_num:
+                        for val_data in val_loader:
                             idx_d+=1
+                            if(idx_d > total_val_num):
+                                break
                             folder = val_data['key'][0]
                             if psnr_rlt.get(folder, None) is None:
                                 psnr_rlt[folder] = []
@@ -138,7 +146,6 @@ def main():
                             psnr = util.calculate_psnr(fake_img, gt_img)
                             psnr_rlt[folder].append(psnr)
                             pbar.update('Test {} - {}'.format(folder, idx_d))
-                        break
 
                     for k, v in psnr_rlt.items():
                         psnr_rlt_avg[k] = sum(v) / len(v)
@@ -154,10 +161,6 @@ def main():
                     logger_val = logging.getLogger('val')
                     logger_val.info('<epoch:{:3d}, iter:{:8,d}> psnr: {:.4e}'.format(current_epoch, current_step, psnr_total_avg))
                     tb_logger.add_scalar('psnr', psnr_total_avg, current_step)
-
-                if current_step % opt['train']['save_checkpoint_freq'] == 0:
-                    logger.info('Saving models and training states')
-                    diffusion.save_network(current_epoch, current_step)
 
         logger.info('End of training')
 
